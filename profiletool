@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 #
-# Copyright 2015 Armin Briegel
+# Copyright 2018 Armin Briegel, Scripting OS X
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A tool that helps manage and manipulate `autopkg` recipes."""
+"""A tool that helps manage and manipulate configuration profiles."""
 
 import os
 import subprocess
@@ -24,7 +24,7 @@ import plistlib
 
 import argparse
 
-recipeutil_version = '0.2'
+profiletool_version = '0.1'
 args = []
 
 
@@ -62,7 +62,7 @@ def get_pref(pref_key, default=None):
 
 
 
-def test_pref(recipe_data):
+def test_pref(profile):
     if len(args.extra_args) > 0:
         keys = args.extra_args
 
@@ -72,58 +72,40 @@ def test_pref(recipe_data):
 
 if __name__ == "__main__":
     actions = {
-        'info': recipe_info,
-        'which': recipe_which,
-        'path': recipe_which,
-        'identifier': recipe_id,
-        'id': recipe_id,
-        'open': recipe_open,
-        'reveal': recipe_reveal,
-        'show': recipe_reveal,
-        'edit': recipe_edit,
-        'status': recipe_status,
-        'cache': open_cache,
-        'clearcache': clear_cache,
-        'duplicate': clone_recipe,
-        'procreate': child_recipe,
-        'newchild': child_recipe,
+        'unsign': unsign_profile,
+        'sign': sign_profile,
+        'check-signature': check_profile_signature,
+        'split': split_profile,
+        'merge': merge_profiles,
+        'reset-uuids': reset_profile_uuids,
+        'reset-identifiers': reset_profile_identifiers,
+        'print': print_profile,
         'pref': test_pref,
         }
     # step 0: parse input from cli
 
     # for convenience link to argparse tutorial:
     # https://docs.python.org/2/howto/argparse.html#id1
-    parser = argparse.ArgumentParser(description='A tool that helps manage and manipulate `autopkg` recipes.',
+    parser = argparse.ArgumentParser(description='A tool that helps manage and manipulate configuration profiles.',
                                      epilog="""actions can be one of the following:
-    info                synonym for `autopkg info`
-    which or path       prints the path to the recipe_id
-    identifier or id    prints the identifier for the recipe
-    open                opens recipe with default application for recipe files
-    reveal or show      reveals the recipe file in the Finder
-    edit                opens the recipe in the text editor set in $EDITOR
-                        if $RECIPE_EDITOR is set it will be used instead
-    status              runs 'git status' on the directory enclosing the recipe
-    cache               opens the cache folder for this recipe in the finder
-    clearcache          deletes the cache folder for this recipe
-    duplicate           prompts for a new identifier and creates a copy of the recipe in the CWD
-    newchild            prompts for a new identifier and creates a new stub recipe with the given recipe as a parent
+    unsign              removes a profiles signature
+    sign                signs the profile
+    check-signature     verifies the signature of a profile
+    split               creates one new profile per payload of the original
+    merge               combines the payload of multiple profiles into a single new profile
+    reset-uuids         resets all PayloadUUID keys with new values
+    reset-identifiers   resets all PayloadIdentifier keys with new values
+    print               prints an overview of a profile's contents
 
-    for 'status' and 'edit' additional options will be passed into the command
-    e.g.: recipeutil status Firefox.download --short
     """, formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('--version', help='prints the version', action='version', version=recipeutil_version)
+    parser.add_argument('--version', help='prints the version', action='version', version=profiletool_version)
 
     parser.add_argument('action', choices=sorted(actions.keys()), help='action to be applied to the recipe')
 
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="controls amount of logging output (max -vvv)")
-    parser.add_argument("-n", "--names", action="store_true", help="prints the recipes' names before the info.")
 
-    parent_option_group = parser.add_mutually_exclusive_group()
-    parent_option_group.add_argument('--parent', '-p', action='store_true', help="apply the action to parent of the recipe")
-    parent_option_group.add_argument('--all-parents', '-a', action='store_true', help="apply the action to the recipe and all its parents")
-
-    parser.add_argument('recipe_name_or_id', help="the recipe name or id")
+    parser.add_argument('profiles', help="configuration profile file", nargs='+')
     parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
 
     # finally, actually parse the arguments
@@ -131,30 +113,9 @@ if __name__ == "__main__":
     logger(args, 3)
     # args.func(args)
 
-    # get the recipe data
-    recipe_data = get_recipe_data(args.recipe_name_or_id)
 
-    # if --parent is set, replace recipe_data with its parent
-    if args.parent:
-        if 'parent_path' in recipe_data:
-            recipe_data = get_recipe_data(recipe_data['parent_path'])
-        else:
-            print "%s does not have a parent recipe!" % (args.recipe_name_or_id)
-            exit(1)
 
-    recipe_list = [recipe_data]
-
-    # if --all-parents is set work through the list
-
-    if args.all_parents:
-        while 'parent_path' in recipe_data:
-            recipe_data = get_recipe_data(recipe_data['parent_path'])
-            recipe_list.append(recipe_data)
-
-    # apply action to all items in recipe_data
-    l = len(recipe_list)
-    for r in recipe_list:
-        if args.names:
-            print
-            print r['name']
-        actions[args.action](r)
+    # apply action to all items in profiles
+    l = len(profiles)
+    for p in profiles:
+        actions[args.action](p)
