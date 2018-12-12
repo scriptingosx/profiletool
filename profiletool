@@ -35,9 +35,7 @@ profiletool_version = '0.1'
 args = []
 
 profile_extension = '.mobileconfig'
-signed_suffix = '_signed'
-unsign_suffix = '_unsigned'
-id_prefix = "com.scriptingosx"
+id_prefix = "new"
 tmpdir = tempfile.mkdtemp()
 
 
@@ -145,12 +143,16 @@ class Profile:
     
     def reset_identifiers(self, identifier_prefix=id_prefix):
         # no idea why assigning to self.identifier does not work
-        self["PayloadIdentifier"] = '.'.join([id_prefix, profile.filename])
+        if args.identifier == None:
+            identifier = '.'.join([id_prefix, profile.filename])
+        else:
+            identifier = args.identifier
+        self["PayloadIdentifier"] = identifier
         for p in self.payloads:
             type=p["PayloadType"]
             if type.startswith("com.apple."):
                 type=type[10:]
-            identifier = '.'.join([id_prefix, type])
+            identifier = '.'.join([identifier, type])
             p["PayloadIdentifier"] = identifier
     
 
@@ -181,7 +183,7 @@ def cmdexec(command):
 
 def unsign_profile(profile):
     if profile.signed:
-        filename = profile.filename + unsign_suffix + profile_extension
+        filename = profile.filename + "_unsigned" + profile_extension
         profile.write(filename, args.identity)
     else:
         print >> sys.stderr, "%s is not signed." % profile.path
@@ -194,7 +196,7 @@ def sign_profile(profile):
     if args.identity == None:
         print >> sys.stderr, "The sign action requires an '--identity'!"
         exit(1)
-    filename = profile.filename + signed_suffix + profile_extension
+    filename = profile.filename + "_signed" + profile_extension
     profile.write(filename, args.identity)
     return
 
@@ -253,6 +255,36 @@ def reset_profile_both(profile):
 
 
 
+def read_value(profile):
+    if args.type == None or len(args.type) > 1:
+        print >> sys.stderr, "'read' requires exactly one '--type'"
+        exit(1)
+    type = args.type[0]
+    
+    if args.key == None:
+        print >> sys.stderr, "'read' requires a '--key'"
+        exit(1)
+    
+    foundpayload = False
+    for p in profile.payloads:
+        if p["PayloadType"] == type:
+            if args.key in p.keys():
+                print p[args.key]
+                foundpayload = True
+            else:
+                print >> sys.stderr, "no key %s in payload %s" % (args.key, type)
+    if not foundpayload:
+        print >> sys.stderr, "no payload " + type
+        exit(1)
+    return
+
+
+
+def write_value(profile):
+    return
+
+
+
 def print_profile(profile):
     print "Name:               " + profile.name
     print "Identifier:         " + profile.identifier
@@ -288,6 +320,8 @@ if __name__ == "__main__":
         'reset-identifiers': reset_profile_identifiers,
         'reset-both': reset_profile_both,
         'info': print_profile,
+        'read': read_value,
+        'write': write_value,
         }
     # step 0: parse input from cli
 
@@ -313,9 +347,10 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="controls amount of logging output (max -vvv)")
     
     parser.add_argument('--identity', help="name of the identity to use for the signature")
-    parser.add_argument('--identifier', help="use this identifier for the profile, e.g. 'com.scriptingosx.myprofile'")
+    parser.add_argument('--identifier', help="use this identifier for the new profile, e.g. 'com.scriptingosx.myprofile'")
     parser.add_argument('-o', '--output', help="path and filename for the result")
     parser.add_argument('-t', '--type', action="append", help="the type of the payload, can be set multiple times")
+    parser.add_argument('-k', '--key', help="the value key for 'read' and 'write' actions")
     
     parser.add_argument('profiles', help="configuration profile file", nargs='+')
     #parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
