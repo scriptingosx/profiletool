@@ -137,9 +137,10 @@ def cmdexec(command):
 
 def unsign_profile(profile):
     if profile.signed:
-        print
+        filename = profile.filename + unsign_suffix + profile_extension
+        plistlib.writePlist(profile.data, filename)
     else:
-        print >> sys.stderr, "Profile is not signed."
+        print >> sys.stderr, "%s is not signed." % profile.path
     return
 
 
@@ -150,6 +151,12 @@ def sign_profile(profile):
 
 
 def check_profile_signature(profile):
+    if profile.signed:
+        print profile.path
+        print profile.signheader
+    else:
+        print "%s: not signed" % profile.path
+
     return
 
 
