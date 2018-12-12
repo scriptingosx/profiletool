@@ -21,12 +21,97 @@ import os
 import subprocess
 import shutil
 import plistlib
+import sys
 
 import argparse
 
 profiletool_version = '0.1'
 args = []
 
+profile_extension = '.mobileconfig'
+signed_suffix = '_signed'
+unsign_suffix = '_unsigned'
+
+class Profile:
+    def __init__(self, path):
+        self.data = {}
+        self.signed = False
+        self.signature = ""
+        self.path = path
+        
+        # sanity check: mobileconfig
+        basename=os.path.basename(path)
+        (self.filename, extension) = os.path.splitext(basename)
+
+        if not extension == profile_extension:
+            print >> sys.stderr, ("not a mobile config: %s" % path)
+            exit(1)
+     
+        # sanity check: does the path exist?
+        if not os.path.exists(path):
+            print >> sys.stderr, ("no file: %s" % path)
+            exit(1)
+    
+        # sanity check: is it a file
+        if not os.path.isfile(path):
+            print >> sys.stderr, ("%s is not a file", path)
+            exit(1)
+    
+        # sanity check: ist the file readable?
+        if not os.access(path, os.R_OK):
+            print >> sys.stderr, ("cannot read file: %s" % path)
+            exit(1)
+    
+        try:
+            self.data=plistlib.readPlist(path)
+        except:
+            # file might be signed, try to unsign
+            cmd=["/usr/bin/security", "cms", "-D", "-h1", "-i", path]
+            result=cmdexec(cmd)
+            if result["return_code"] == 0:
+                self.signed = True
+                out=result["stdout"]
+                xmlstart=out.index("<?xml")
+                self.signheader=out[:xmlstart]
+                self.data=plistlib.readPlistFromString(out[xmlstart:])
+            else:
+                print >> sys.stderr, ("could not read file: %s" % path)
+                exit(1)
+    
+    # class methods for accessing data
+    def __getitem__(self, key): 
+        if (key in self.data.keys()):
+            return self.data[key]
+    
+    def __setitem__(self, key, item): 
+        self.data[key] = item
+    
+    def __delitem__(self, key): del self.data[key]
+
+    # some methods to simply access
+    
+    @property
+    def name(self):
+        return self.data["PayloadDisplayName"]
+    @name.setter
+    def name(self, value):
+        self.data["PayloadDisplayName"] = value
+    
+    @property
+    def identifier(self):
+        return self.data["PayloadIdentifier"]
+    @identifier.setter
+    def identifier(self, value):
+        self.data["PayloadIdentifier"] = value
+    
+    @property
+    def uuid(self):
+        return self.data["PayloadUUID"]
+    @uuid.setter
+    def uuid(self, value):
+        self.data["PayloadUUID"] = value
+
+    
 
 def logger(log, v=0):
     if args.verbosity >= v:
@@ -46,6 +131,71 @@ def cmdexec(command):
 
     # strip trailing whitespace, which would mess with string comparisons
     return {"return_code": proc.returncode, "stderr": stderr.rstrip(), "stdout": stdout.rstrip()}
+
+
+# actions
+
+def unsign_profile(profile):
+    if profile.signed:
+        print
+    else:
+        print >> sys.stderr, "Profile is not signed."
+    return
+
+
+
+def sign_profile(profile):
+    return
+
+
+
+def check_profile_signature(profile):
+    return
+
+
+
+def split_profile(profile):
+    return
+
+
+
+def merge_profiles(profile):
+    return
+
+
+
+def reset_profile_uuids(profile):
+    return
+
+
+
+def reset_profile_identifiers(profile):
+    return
+
+
+
+def print_profile(profile):
+    print "Name:               " + profile.name
+    print "Identifier:         " + profile.identifier
+    print "UUID:               " + profile.uuid
+    print "Organization:       " + profile["PayloadOrganization"]
+    print "Scope:              " + profile["PayloadScope"]
+    print "RemovalDisallowed:  " + str(profile["PayloadRemovalDisallowed"])
+    print "Signed:             " + str(profile.signed)
+    print "Description:"
+    print profile["PayloadDescription"]
+    print "Payloads:           " + str(len(profile["PayloadContent"]))
+    for p in profile["PayloadContent"]:
+        print " " + str(profile["PayloadContent"].index(p))
+        print "  Name:             " + p["PayloadDisplayName"]
+        print "  Type:             " + p["PayloadType"]
+        print "  Identifier:       " + p["PayloadIdentifier"]
+        print "  UUID:             " + p["PayloadUUID"]
+    print
+
+    return
+
+
 
 
 
@@ -79,8 +229,7 @@ if __name__ == "__main__":
         'merge': merge_profiles,
         'reset-uuids': reset_profile_uuids,
         'reset-identifiers': reset_profile_identifiers,
-        'print': print_profile,
-        'pref': test_pref,
+        'info': print_profile,
         }
     # step 0: parse input from cli
 
@@ -88,25 +237,25 @@ if __name__ == "__main__":
     # https://docs.python.org/2/howto/argparse.html#id1
     parser = argparse.ArgumentParser(description='A tool that helps manage and manipulate configuration profiles.',
                                      epilog="""actions can be one of the following:
-    unsign              removes a profiles signature
+    unsign              removes a profile's signature
     sign                signs the profile
     check-signature     verifies the signature of a profile
     split               creates one new profile per payload of the original
-    merge               combines the payload of multiple profiles into a single new profile
+    merge               combines the payload of multiple profiles
     reset-uuids         resets all PayloadUUID keys with new values
     reset-identifiers   resets all PayloadIdentifier keys with new values
-    print               prints an overview of a profile's contents
+    info                prints an overview of a profile's contents
 
     """, formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('--version', help='prints the version', action='version', version=profiletool_version)
 
-    parser.add_argument('action', choices=sorted(actions.keys()), help='action to be applied to the recipe')
+    parser.add_argument('action', choices=sorted(actions.keys()), help='action to be applied to the profile(s)')
 
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="controls amount of logging output (max -vvv)")
 
     parser.add_argument('profiles', help="configuration profile file", nargs='+')
-    parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
+    #parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
 
     # finally, actually parse the arguments
     args = parser.parse_args()
@@ -116,6 +265,7 @@ if __name__ == "__main__":
 
 
     # apply action to all items in profiles
-    l = len(profiles)
-    for p in profiles:
-        actions[args.action](p)
+    l = len(args.profiles)
+    for p in args.profiles:
+        profile=Profile(p)
+        actions[args.action](profile)
