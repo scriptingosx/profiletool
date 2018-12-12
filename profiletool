@@ -203,9 +203,11 @@ def merge_profiles(profile):
 
 
 def reset_profile_uuids(profile):
-    profile.uuid = uuid.uuid1()
+    profile.uuid = str(uuid.uuid1())
     for p in profile.payloads:
-        p["PayloadUUID"] = uuid.uuid1()
+        p["PayloadUUID"] = str(uuid.uuid1())
+    filename = profile.filename + "_resetuuids" + profile_extension
+    profile.write(filename)
     return
 
 
@@ -223,8 +225,7 @@ def print_profile(profile):
     print "Scope:              " + profile["PayloadScope"]
     print "RemovalDisallowed:  " + str(profile["PayloadRemovalDisallowed"])
     print "Signed:             " + str(profile.signed)
-    print "Description:"
-    print profile["PayloadDescription"]
+    print "Description:        " + profile["PayloadDescription"]
     print "Payloads:           " + str(len(profile["PayloadContent"]))
     for p in profile.payloads:
         print " " + str(profile.payloads.index(p))
@@ -243,6 +244,9 @@ if __name__ == "__main__":
         'unsign': unsign_profile,
         'sign': sign_profile,
         'check-signature': check_profile_signature,
+        'check-sign': check_profile_signature,
+        'check-sig': check_profile_signature,
+        'check': check_profile_signature,
         'split': split_profile,
         'merge': merge_profiles,
         'reset-uuids': reset_profile_uuids,
@@ -281,9 +285,6 @@ if __name__ == "__main__":
     # finally, actually parse the arguments
     args = parser.parse_args()
     logger(args, 3)
-    # args.func(args)
-
-
 
     # apply action to all items in profiles
     l = len(args.profiles)
