@@ -108,10 +108,10 @@ class Profile:
     
     @property
     def identifier(self):
-        return self.data["PayloadIdentifier"]
+        return self["PayloadIdentifier"]
     @identifier.setter
     def identifier(self, value):
-        self.data["PayloadIdentifier"] = value
+        self["PayloadIdentifier"] = value
     
     @property
     def uuid(self):
@@ -135,6 +135,23 @@ class Profile:
             cmd=["/usr/bin/security", "cms", "-S", "-N", identity, "-i", tmppath, "-o", path]
             result=cmdexec(cmd)
             os.remove(tmppath)
+    
+    def reset_uuids(self):
+        self.uuid = str(uuid.uuid1())
+        for p in self.payloads:
+            p["PayloadUUID"] = str(uuid.uuid1())
+    
+    def reset_identifiers(self, identifier_prefix=id_prefix):
+        # no idea why assigning to self.identifier does not work
+        self["PayloadIdentifier"] = '.'.join([id_prefix, profile.filename])
+        for p in self.payloads:
+            type=p["PayloadType"]
+            if type.startswith("com.apple."):
+                type=type[10:]
+            identifier = '.'.join([id_prefix, type])
+            p["PayloadIdentifier"] = identifier
+
+    
 
 # utility functions
 
@@ -203,9 +220,7 @@ def merge_profiles(profile):
 
 
 def reset_profile_uuids(profile):
-    profile.uuid = str(uuid.uuid1())
-    for p in profile.payloads:
-        p["PayloadUUID"] = str(uuid.uuid1())
+    profile.reset_uuids()
     filename = profile.filename + "_resetuuids" + profile_extension
     profile.write(filename)
     return
@@ -213,6 +228,10 @@ def reset_profile_uuids(profile):
 
 
 def reset_profile_identifiers(profile):
+    profile.reset_identifiers()
+    filename = profile.filename + "_resetids" + profile_extension
+    profile.write(filename)
+
     return
 
 
