@@ -18,12 +18,17 @@
 """A tool that helps manage and manipulate configuration profiles."""
 
 import os
-import subprocess
-import shutil
-import plistlib
 import sys
+import subprocess
+import plistlib
+import uuid
+import tempfile
+import shutil
 
 import argparse
+
+
+# global variables
 
 profiletool_version = '0.1'
 args = []
@@ -31,6 +36,11 @@ args = []
 profile_extension = '.mobileconfig'
 signed_suffix = '_signed'
 unsign_suffix = '_unsigned'
+id_prefix = "com.scriptingosx"
+tmpdir = tempfile.mkdtemp()
+
+
+# profile
 
 class Profile:
     def __init__(self, path):
@@ -89,7 +99,6 @@ class Profile:
     def __delitem__(self, key): del self.data[key]
 
     # some methods to simply access
-    
     @property
     def name(self):
         return self.data["PayloadDisplayName"]
@@ -111,7 +120,23 @@ class Profile:
     def uuid(self, value):
         self.data["PayloadUUID"] = value
 
-    
+    @property
+    def payloads(self):
+        return self.data["PayloadContent"]
+   
+    # write the profile to a file
+    def write(self, path, identity = None):
+        if identity == None:
+            plistlib.writePlist(self.data, path)
+        else:
+            # TODO: sanity check if identity exists?
+            tmppath=os.path.join(tmpdir, self.filename + profile_extension)
+            plistlib.writePlist(self.data, tmppath)
+            cmd=["/usr/bin/security", "cms", "-S", "-N", identity, "-i", tmppath, "-o", path]
+            result=cmdexec(cmd)
+            os.remove(tmppath)
+
+# utility functions
 
 def logger(log, v=0):
     if args.verbosity >= v:
@@ -131,14 +156,14 @@ def cmdexec(command):
 
     # strip trailing whitespace, which would mess with string comparisons
     return {"return_code": proc.returncode, "stderr": stderr.rstrip(), "stdout": stdout.rstrip()}
-
-
+    
+    
 # actions
 
 def unsign_profile(profile):
     if profile.signed:
         filename = profile.filename + unsign_suffix + profile_extension
-        plistlib.writePlist(profile.data, filename)
+        profile.write(filename)
     else:
         print >> sys.stderr, "%s is not signed." % profile.path
     return
@@ -146,13 +171,12 @@ def unsign_profile(profile):
 
 
 def sign_profile(profile):
+    # sanity check: is an identity given?
+    if args.identity == None or args.identity == "":
+        print >> sys.stderr, "The sign action requires an '--identity'!"
+        exit(1)
     filename = profile.filename + signed_suffix + profile_extension
-    tmpfilename=profile.filename + "_temp" + profile_extension
-    plistlib.writePlist(profile.data, tmpfilename)
-    cmd=["/usr/bin/security", "cms", "-S", "-N", args.identity, "-i", tmpfilename, "-o", filename]
-    result=cmdexec(cmd)
-    os.remove(tmpfilename)
-    print result
+    profile.write(filename, args.identity)
     return
 
 
@@ -179,6 +203,9 @@ def merge_profiles(profile):
 
 
 def reset_profile_uuids(profile):
+    profile.uuid = uuid.uuid1()
+    for p in profile.payloads:
+        p["PayloadUUID"] = uuid.uuid1()
     return
 
 
@@ -199,8 +226,8 @@ def print_profile(profile):
     print "Description:"
     print profile["PayloadDescription"]
     print "Payloads:           " + str(len(profile["PayloadContent"]))
-    for p in profile["PayloadContent"]:
-        print " " + str(profile["PayloadContent"].index(p))
+    for p in profile.payloads:
+        print " " + str(profile.payloads.index(p))
         print "  Name:             " + p["PayloadDisplayName"]
         print "  Type:             " + p["PayloadType"]
         print "  Identifier:       " + p["PayloadIdentifier"]
@@ -209,29 +236,6 @@ def print_profile(profile):
 
     return
 
-
-
-
-
-def get_pref(pref_key, default=None):
-    pref_domain = "com.github.autopkg"
-    r = cmdexec(["defaults", "read", pref_domain, pref_key])
-    if r["return_code"] == 0:
-        return r["stdout"]
-
-    if pref_key in os.environ:
-        return os.environ[pref_key]
-
-    return default
-
-
-
-def test_pref(profile):
-    if len(args.extra_args) > 0:
-        keys = args.extra_args
-
-    for x in keys:
-        print "%s: %s" % (x, get_pref(x))
 
 
 if __name__ == "__main__":
@@ -286,3 +290,6 @@ if __name__ == "__main__":
     for p in args.profiles:
         profile=Profile(p)
         actions[args.action](profile)
+    
+    # cleanup
+    shutil.rmtree(tmpdir)
