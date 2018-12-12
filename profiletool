@@ -137,9 +137,9 @@ class Profile:
             os.remove(tmppath)
     
     def reset_uuids(self):
-        self.uuid = str(uuid.uuid1())
+        self["PayloadUUID"] = str(uuid.uuid1())
         for p in self.payloads:
-            p["PayloadUUID"] = str(uuid.uuid1())
+            p["PayloadUUID"] = str(uuid.uuid4())
     
     def reset_identifiers(self, identifier_prefix=id_prefix):
         # no idea why assigning to self.identifier does not work
@@ -152,8 +152,8 @@ class Profile:
             type=p["PayloadType"]
             if type.startswith("com.apple."):
                 type=type[10:]
-            identifier = '.'.join([identifier, type])
-            p["PayloadIdentifier"] = identifier
+            payloadidentifier = '.'.join([identifier, type])
+            p["PayloadIdentifier"] = payloadidentifier
     
 
 
@@ -281,6 +281,32 @@ def read_value(profile):
 
 
 def write_value(profile):
+    if args.type == None or len(args.type) > 1:
+        print >> sys.stderr, "'write' requires exactly one '--type'"
+        exit(1)
+    type = args.type[0]
+    
+    if args.key == None:
+        print >> sys.stderr, "'write' requires a '--key'"
+        exit(1)
+    
+    if args.string == None:
+        print >> sys.stderr, "'write' requires a '-string'"
+        exit(1)
+        
+    foundpayload = False
+    for p in profile.payloads:
+        if p["PayloadType"] == type:
+            p[args.key] = args.string
+            foundpayload = True
+    
+    if not foundpayload:
+        print >> sys.stderr, "no payload " + type
+        exit(1)
+    
+    # change in place
+    profile.write(profile.path)
+    
     return
 
 
@@ -351,6 +377,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output', help="path and filename for the result")
     parser.add_argument('-t', '--type', action="append", help="the type of the payload, can be set multiple times")
     parser.add_argument('-k', '--key', help="the value key for 'read' and 'write' actions")
+    parser.add_argument('-string', '--string', help="the value for the 'write' action")
     
     parser.add_argument('profiles', help="configuration profile file", nargs='+')
     #parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
