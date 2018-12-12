@@ -24,6 +24,7 @@ import plistlib
 import uuid
 import tempfile
 import shutil
+import copy
 
 import argparse
 
@@ -97,6 +98,7 @@ class Profile:
         self.data[key] = item
     
     def __delitem__(self, key): del self.data[key]
+            
 
     # some methods to simply access
     @property
@@ -150,8 +152,8 @@ class Profile:
                 type=type[10:]
             identifier = '.'.join([id_prefix, type])
             p["PayloadIdentifier"] = identifier
-
     
+
 
 # utility functions
 
@@ -209,12 +211,19 @@ def check_profile_signature(profile):
 
 
 
-def split_profile(profile):
-    return
-
-
-
-def merge_profiles(profile):
+def extract_payloads(profile):
+    if args.type == None or len(args.type) == 0:
+        print >> sys.stderr, "extract needs at least one '--type'"
+        exit(1)
+    new = copy.deepcopy(profile)
+    new["PayloadContent"] = []
+    for p in profile.payloads:
+        if p["PayloadType"] in args.type:
+            new["PayloadContent"].append(p)
+    new.reset_uuids()
+    new.reset_identifiers()
+    filename = new.filename + "_extract" + profile_extension
+    new.write(filename, args.identity)
     return
 
 
@@ -274,8 +283,7 @@ if __name__ == "__main__":
         'check-sign': check_profile_signature,
         'check-sig': check_profile_signature,
         'check': check_profile_signature,
-        'split': split_profile,
-        'merge': merge_profiles,
+        'extract': extract_payloads,
         'reset-uuids': reset_profile_uuids,
         'reset-identifiers': reset_profile_identifiers,
         'reset-both': reset_profile_both,
@@ -290,8 +298,7 @@ if __name__ == "__main__":
     unsign              removes a profile's signature
     sign                signs the profile
     check-signature     verifies the signature of a profile
-    split               creates one new profile per payload of the original
-    merge               combines the payload of multiple profiles
+    extract              creates a new profile with a subset of given payloads
     reset-uuids         resets all PayloadUUID keys with new values
     reset-identifiers   resets all PayloadIdentifier keys with new values
     reset-both          resets both PayloadIdentifier and PayloadUUIDs with new values
@@ -305,8 +312,10 @@ if __name__ == "__main__":
 
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="controls amount of logging output (max -vvv)")
     
-    parser.add_argument('-i', '--identity', help="name of the identity to use for the signature")
+    parser.add_argument('--identity', help="name of the identity to use for the signature")
+    parser.add_argument('--identifier', help="use this identifier for the profile, e.g. 'com.scriptingosx.myprofile'")
     parser.add_argument('-o', '--output', help="path and filename for the result")
+    parser.add_argument('-t', '--type', action="append", help="the type of the payload, can be set multiple times")
     
     parser.add_argument('profiles', help="configuration profile file", nargs='+')
     #parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
