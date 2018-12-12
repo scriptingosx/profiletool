@@ -180,7 +180,7 @@ def cmdexec(command):
 def unsign_profile(profile):
     if profile.signed:
         filename = profile.filename + unsign_suffix + profile_extension
-        profile.write(filename)
+        profile.write(filename, args.identity)
     else:
         print >> sys.stderr, "%s is not signed." % profile.path
     return
@@ -189,7 +189,7 @@ def unsign_profile(profile):
 
 def sign_profile(profile):
     # sanity check: is an identity given?
-    if args.identity == None or args.identity == "":
+    if args.identity == None:
         print >> sys.stderr, "The sign action requires an '--identity'!"
         exit(1)
     filename = profile.filename + signed_suffix + profile_extension
@@ -222,16 +222,24 @@ def merge_profiles(profile):
 def reset_profile_uuids(profile):
     profile.reset_uuids()
     filename = profile.filename + "_resetuuids" + profile_extension
-    profile.write(filename)
+    profile.write(filename, args.identity)
     return
 
 
 
 def reset_profile_identifiers(profile):
     profile.reset_identifiers()
-    filename = profile.filename + "_resetids" + profile_extension
-    profile.write(filename)
+    filename = profile.filename + "_resetidentifiers" + profile_extension
+    profile.write(filename, args.identity)
+    return
 
+
+
+def reset_profile_both(profile):
+    profile.reset_identifiers()
+    profile.reset_uuids()
+    filename = profile.filename + "_reset" + profile_extension
+    profile.write(filename, args.identity)
     return
 
 
@@ -270,6 +278,7 @@ if __name__ == "__main__":
         'merge': merge_profiles,
         'reset-uuids': reset_profile_uuids,
         'reset-identifiers': reset_profile_identifiers,
+        'reset-both': reset_profile_both,
         'info': print_profile,
         }
     # step 0: parse input from cli
@@ -285,6 +294,7 @@ if __name__ == "__main__":
     merge               combines the payload of multiple profiles
     reset-uuids         resets all PayloadUUID keys with new values
     reset-identifiers   resets all PayloadIdentifier keys with new values
+    reset-both          resets both PayloadIdentifier and PayloadUUIDs with new values
     info                prints an overview of a profile's contents
 
     """, formatter_class=argparse.RawTextHelpFormatter)
@@ -294,9 +304,9 @@ if __name__ == "__main__":
     parser.add_argument('action', choices=sorted(actions.keys()), help='action to be applied to the profile(s)')
 
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="controls amount of logging output (max -vvv)")
-
     
-    parser.add_argument('--identity', help="name of the identity to use for the signature")
+    parser.add_argument('-i', '--identity', help="name of the identity to use for the signature")
+    parser.add_argument('-o', '--output', help="path and filename for the result")
     
     parser.add_argument('profiles', help="configuration profile file", nargs='+')
     #parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
