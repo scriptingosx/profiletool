@@ -98,10 +98,12 @@ class Profile:
     def __delitem__(self, key): del self.data[key]
             
 
-    # some methods to simply access
+    # some methods to simplify access
+    
     @property
     def name(self):
         return self.data["PayloadDisplayName"]
+    
     @name.setter
     def name(self, value):
         self.data["PayloadDisplayName"] = value
@@ -109,6 +111,7 @@ class Profile:
     @property
     def identifier(self):
         return self["PayloadIdentifier"]
+    
     @identifier.setter
     def identifier(self, value):
         self["PayloadIdentifier"] = value
@@ -116,6 +119,7 @@ class Profile:
     @property
     def uuid(self):
         return self.data["PayloadUUID"]
+    
     @uuid.setter
     def uuid(self, value):
         self.data["PayloadUUID"] = value
@@ -358,7 +362,7 @@ if __name__ == "__main__":
     unsign              removes a profile's signature
     sign                signs the profile
     check-signature     verifies the signature of a profile
-    extract              creates a new profile with a subset of given payloads
+    extract             creates a new profile with a subset of given payloads
     reset-uuids         resets all PayloadUUID keys with new values
     reset-identifiers   resets all PayloadIdentifier keys with new values
     reset-both          resets both PayloadIdentifier and PayloadUUIDs with new values
@@ -380,7 +384,7 @@ if __name__ == "__main__":
     parser.add_argument('-string', '--string', help="the value for the 'write' action")
     
     parser.add_argument('profiles', help="configuration profile file", nargs='+')
-    #parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
+    # parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="extra arguments will be passed through to 'edit' and 'status' commands")
 
     # finally, actually parse the arguments
     args = parser.parse_args()
