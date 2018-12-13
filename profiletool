@@ -264,19 +264,19 @@ def read_value(profile):
         print >> sys.stderr, "'read' requires exactly one '--type'"
         exit(1)
     type = args.type[0]
-    
-    if args.key == None:
-        print >> sys.stderr, "'read' requires a '--key'"
-        exit(1)
-    
+        
     foundpayload = False
     for p in profile.payloads:
         if p["PayloadType"] == type:
-            if args.key in p.keys():
+            foundpayload = True
+            if args.key == None:
+                for k in p.keys():
+                    print "%s:  %s" % ( k, p[k] )
+            elif args.key in p.keys():
                 print p[args.key]
-                foundpayload = True
             else:
                 print >> sys.stderr, "no key %s in payload %s" % (args.key, type)
+                exit(1)
     if not foundpayload:
         print >> sys.stderr, "no payload " + type
         exit(1)
@@ -367,6 +367,8 @@ if __name__ == "__main__":
     reset-identifiers   resets all PayloadIdentifier keys with new values
     reset-both          resets both PayloadIdentifier and PayloadUUIDs with new values
     info                prints an overview of a profile's contents
+    read                prints a value from a payload content
+    write               sets a value in a payload content
 
     """, formatter_class=argparse.RawTextHelpFormatter)
 
